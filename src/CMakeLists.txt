@@ -8,15 +8,11 @@
 #
 ################################################################################
 
-#cmake_minimum_required(VERSION 3.16.3)
+#cmake_minimum_required(VERSION 3.18)
 
 #project(snap_test)
 
 #enable_language(Fortran)
-
-# TODO: setup install directory in build/bin
-
-message(STATUS ${CMAKE_Fortran_COMPILER_LIST})
 
 ################################################################################
 #
@@ -24,14 +20,37 @@ message(STATUS ${CMAKE_Fortran_COMPILER_LIST})
 #
 ################################################################################
 
+
 option(MPI "Use MPI" OFF)
 option(OPT "Turn on optimizations" ON)
 option(OPENMP "Enable OpenMP" OFF)
 option(KNL "Intel KNL target" OFF)
 option(HASWELL "Does the CPU use the Haswell u-arch" OFF)
+option(CRAY "Is the target system a Cray?" OFF)
 
 if(MPI)
 	find_package(MPI REQUIRED)
+	message(STATUS "MPI_Fortran_COMPILER - ${MPI_Fortran_COMPILER}")
+	message(STATUS "MPI_Fortran_COMPILE_OPTIONS - ${MPI_Fortran_COMPILE_OPTIONS}")
+	message(STATUS "MPI_Fortran_COMPILE_DEFINITIONS - ${MPI_Fortran_COMPILE_DEFINITIONS}")
+	message(STATUS "MPI_Fortran_INCLUDE_DIRS - ${MPI_Fortran_INCLUDE_DIRS}")
+	message(STATUS "MPI_Fortran_LINK_FLAGS - ${MPI_Fortran_LINK_FLAGS}")
+	message(STATUS "MPI_Fortran_LIB_NAMES - ${MPI_Fortran_LIB_NAMES}")
+	message(STATUS "MPI_Fortran_LIBRARY - ${MPI_Fortran_LIBRARY}")
+	message(STATUS "MPI_Fortran_LIBRARIES - ${MPI_Fortran_LIBRARIES}")
+endif()
+
+if(OPENMP)
+	find_package(OpenMP REQUIRED)
+	message(STATUS "OpenMP_VERSION - ${OpenMP_VERSION}")
+	message(STATUS "OpenMP_Fortran_FOUND - ${OpenMP_Fortran_COMPILE_OPTIONS}")
+	message(STATUS "OpenMP_Fortran_FLAGS - ${OpenMP_Fortran_COMPILE_DEFINITIONS}")
+	message(STATUS "OpenMP_Fortran_INCLUDE_DIRS - ${OpenMP_Fortran_INCLUDE_DIRS}")
+	message(STATUS "OpenMP_Fortran_LINK_FLAGS - ${OpenMP_Fortran_LINK_FLAGS}")
+	message(STATUS "OpenMP_Fortran_LIB_NAMES - ${OpenMP_Fortran_LIB_NAMES}")
+	message(STATUS "OpenMP_Fortran_LIBRARY - ${OpenMP_Fortran_LIBRARY}")
+	message(STATUS "OpenMP_Fortran_LIBRARIES - ${OpenMP_Fortran_LIBRARIES}")
+	message(STATUS "OpenMP_HOME - ${OpenMP_HOME}")
 endif()
 
 #set(MPI "" CACHE STRING "Configure MPI")
@@ -46,6 +65,7 @@ endif()
 # If the developer wants MPI, it would be set here
 # e.g., MPI + other pound define --> -DUSER_DEFS="MPI;OTHER_VAR;OTHER_VAR2=1"
 set(USER_DEFS "" CACHE STRING "Semi-colon separted preprocessor pound defines")
+
 
 ################################################################################
 #
@@ -240,9 +260,6 @@ set_source_files_properties(
 		Fortran_PREPROCESS ON
 )
 
-# TODO: Need to handle LLVM Flang!
-
-# TODO: Wrap in an if statement LLVM Flang because CMake does not support it
 add_executable(snap)
 target_sources(snap
 	PRIVATE
@@ -256,18 +273,81 @@ target_compile_options(snap
   	$<$<AND:$<Fortran_COMPILER_ID:Intel>,$<BOOL:${KNL}>>:${SNAP_COMPILER_OPTIONS_IFORT_KNL}>
 		$<$<Fortran_COMPILER_ID:IntelLLVM>:${SNAP_COMPILER_OPTIONS_IFX}>
 		$<$<Fortran_COMPILER_ID:Flang>:${SNAP_COMPILER_OPTIONS_CLASSIC_FLANG}>
-
-#TODO: Target compile options for Cray with MPI
-		#target_compile_options: -L${MPICH_DIR)/lib -lmpich
 )
 target_compile_definitions(snap
 	PRIVATE
 		${USER_DEFS}
+		$<$<AND:$<BOOL:${MPI}>,$<BOOL:${CRAY}>>:MPI>
+		$<$<BOOL:${OPENMP}>:OPENMP>
 )
-#TODO: Target include options for Cray with MPI
-# target_include_directories:	-I$(MPICH_DIR)/include
+# -I$(MPICH_DIR)/include
+target_include_directories(snap
+	PRIVATE
+		$<$<AND:$<BOOL:${MPI}>,$<BOOL:${CRAY}>>:${MPI_Fortran_INCLUDE_DIRS}>
+		$<$<BOOL:${OPENMP}>:${OpenMP_Fortran_INCLUDE_DIRS}>
+)
+target_link_libraries(snap
+	PRIVATE
+		$<$<AND:$<BOOL:${MPI}>,$<BOOL:${CRAY}>>:MPI::MPI_Fortran>
+		$<$<BOOL:${OPENMP}>:${OpenMP_Fortran_LIBRARIES}>
+)
 
-
+# create line counting functionality
+add_custom_target(
+	count
+	#ALL
+	DEPENDS
+		Lines
+)
+#set(ENV{__SNAP_SRC_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+#message(STATUS "env var __SNAP_SRC_DIR - $ENV{__SNAP_SRC_DIR}")
+add_custom_command(
+	OUTPUT
+		src_list.txt
+	DEPENDS
+		${SNAP_SOURCE_FILES}
+	COMMAND
+		cmake -E touch ${CMAKE_CURRENT_BINARY_DIR}/src_list.txt
+	COMMAND
+		echo ${SNAP_SOURCE_FILES} > ${CMAKE_CURRENT_BINARY_DIR}/src_list.txt
+	COMMENT
+		"Generate source file list lines of code"
+	VERBATIM
+)
+add_custom_command(
+	OUTPUT
+		Lines
+	DEPENDS
+		src_list.txt
+	COMMAND
+		cmake -E copy 
+			${CMAKE_CURRENT_SOURCE_DIR}/LineCount	
+			${CMAKE_CURRENT_BINARY_DIR}/LineCount
+	COMMAND
+		cmake -E copy 
+			${CMAKE_CURRENT_SOURCE_DIR}/LineReport	
+			${CMAKE_CURRENT_BINARY_DIR}/LineReport
+	COMMAND
+		cmake -E remove ${CMAKE_CURRENT_BINARY_DIR}/Lines
+	COMMAND
+		cmake -E touch ${CMAKE_CURRENT_BINARY_DIR}/Lines
+	COMMAND
+		cmake -E cat ${CMAKE_CURRENT_BINARY_DIR}/src_list.txt
+	COMMAND
+	#bash -c "while read file; do for word in $file; do ./LineCount $file Lines; done"
+	bash -c "while read line; do \
+			for file in $line; do \
+				${CMAKE_CURRENT_BINARY_DIR}/LineCount ${CMAKE_CURRENT_SOURCE_DIR}/$file	${CMAKE_CURRENT_BINARY_DIR}/Lines; \
+			done; \
+		done < '${CMAKE_CURRENT_BINARY_DIR}/src_list.txt'" 
+	COMMAND
+		awk -f ${CMAKE_CURRENT_BINARY_DIR}/LineReport < ${CMAKE_CURRENT_BINARY_DIR}/Lines >> ${CMAKE_CURRENT_BINARY_DIR}/Lines
+	COMMAND
+		cmake -E cat ${CMAKE_CURRENT_BINARY_DIR}/Lines
+	COMMAND
+		cmake -E remove ${CMAKE_CURRENT_BINARY_DIR}/src_list.txt
+	VERBATIM
+)
 # TODO: create a custom target to do this line counting operation from Makefile
 ## Count lines of code
 #count:
