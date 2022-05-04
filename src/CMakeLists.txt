@@ -53,6 +53,8 @@ endif()
 # e.g., MPI + other pound define --> -DUSER_DEFS="MPI;OTHER_VAR;OTHER_VAR2=1"
 set(USER_DEFS "" CACHE STRING "Semi-colon separted preprocessor pound defines")
 
+set(PGM_DIR "" CACHE STRING "Location of libpgmath if using LLVM flang")
+
 
 ################################################################################
 #
@@ -163,6 +165,30 @@ set(SNAP_COMPILER_OPTIONS_IFX
 	"Compiler options when ifx compiler detected"
 )
 
+# Compile Options for LLVM FLang
+set(SNAP_COMPILER_OPTIONS_GNU_OPT
+	"-O3" 
+	CACHE 
+	STRING 
+	"GNU compiler options when OPT=ON"
+)
+set(SNAP_COMPILER_OPTIONS_GNU_NOT_OPT
+	"-O0"
+	"-g"
+	"-fbounds-check"
+	"-fbacktrace"
+	CACHE 
+	STRING 
+	"GNU compiler options when OPT=OFF"
+)
+set(SNAP_COMPILER_OPTIONS_GNU
+	$<$<BOOL:${OPENMP}>:-fopenmp>
+	$<IF:$<BOOL:${OPT}>,${SNAP_COMPILER_OPTIONS_GNU_OPT},${SNAP_COMPILER_OPTIONS_GNU_NOT_OPT}>
+	CACHE
+	STRING
+	"Compiler options when GNU compiler detected"
+)
+
 ################################################################################
 #
 # Setting up build target
@@ -244,8 +270,9 @@ target_include_directories(snap
 )
 target_link_libraries(snap
 	PRIVATE
-		$<$<AND:$<BOOL:${MPI}>,$<BOOL:${CRAY}>>:MPI::MPI_Fortran>
-		$<$<BOOL:${OPENMP}>:${OpenMP_Fortran_LIBRARIES}>
+		"$<$<AND:$<BOOL:${MPI}>,$<BOOL:${CRAY}>>:${MPI_Fortran_LIBRARIES}>"
+		"$<$<BOOL:${OPENMP}>:${OpenMP_Fortran_LIBRARIES}>"
+		"$<$<Fortran_COMPILER_ID:LLVMFlang>:${PGM_DIR}/libpgmath.so>"
 )
 
 # create line counting functionality
