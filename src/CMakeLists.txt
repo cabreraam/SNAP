@@ -166,24 +166,21 @@ set(SNAP_COMPILER_OPTIONS_IFX
 )
 
 # Compile Options for LLVM FLang
-set(SNAP_COMPILER_OPTIONS_GNU_OPT
-	"-O3" 
+set(SNAP_COMPILER_OPTIONS_LLVM_FLANG_OPT
+	"" 
 	CACHE 
 	STRING 
-	"GNU compiler options when OPT=ON"
+	"LLVMFlang compiler options when OPT=ON"
 )
-set(SNAP_COMPILER_OPTIONS_GNU_NOT_OPT
-	"-O0"
-	"-g"
-	"-fbounds-check"
-	"-fbacktrace"
+set(SNAP_COMPILER_OPTIONS_LLVM_FLANG_NOT_OPT
+	""
 	CACHE 
 	STRING 
-	"GNU compiler options when OPT=OFF"
+	"LLVMFlang compiler options when OPT=OFF"
 )
-set(SNAP_COMPILER_OPTIONS_GNU
-	$<$<BOOL:${OPENMP}>:-fopenmp>
-	$<IF:$<BOOL:${OPT}>,${SNAP_COMPILER_OPTIONS_GNU_OPT},${SNAP_COMPILER_OPTIONS_GNU_NOT_OPT}>
+set(SNAP_COMPILER_OPTIONS_LLVM_FLANG
+	$<$<BOOL:${OPENMP}>:""> # what is the OpenMP flag for LLVMFlang?
+	$<IF:$<BOOL:${OPT}>,${SNAP_COMPILER_OPTIONS_LLVM_FLANG_OPT},${SNAP_COMPILER_OPTIONS_LLVM_FLANG_NOT_OPT}>
 	CACHE
 	STRING
 	"Compiler options when GNU compiler detected"
@@ -255,6 +252,7 @@ target_compile_options(snap
 		$<$<AND:$<Fortran_COMPILER_ID:Intel>,$<NOT:$<BOOL:${KNL}>>>:${SNAP_COMPILER_OPTIONS_IFORT}>
 		$<$<AND:$<Fortran_COMPILER_ID:Intel>,$<BOOL:${KNL}>>:${SNAP_COMPILER_OPTIONS_IFORT_KNL}>
 		$<$<Fortran_COMPILER_ID:IntelLLVM>:${SNAP_COMPILER_OPTIONS_IFX}>
+		$<$<Fortran_COMPILER_ID:LLVMFlang>:${SNAP_COMPILER_OPTIONS_LLVM_FLANG}>
 )
 target_compile_definitions(snap
 	PRIVATE
