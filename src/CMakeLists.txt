@@ -55,6 +55,8 @@ set(USER_DEFS "" CACHE STRING "Semi-colon separted preprocessor pound defines")
 
 set(PGM_DIR "" CACHE STRING "Location of libpgmath if using LLVM flang")
 
+set(FP_TOLERANCE "0.001" CACHE STRING )
+
 
 ################################################################################
 #
